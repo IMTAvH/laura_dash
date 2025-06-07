@@ -130,22 +130,32 @@ server <- function(input, output, session) {
       )
     })
     datos(df)
-    ultima_fecha(format(Sys.time(), "%d/%m/%Y %H:%M:%S"))
+    ultima_fecha(Sys.time())
   }
   
   observeEvent(input$actualizar_datos, {
-    cargar_datos()
+    message("Botón presionado: actualizando datos...")
+    
+    withProgress(message = "Actualizando datos...", value = 0.3, {
+      cargar_datos()
+      incProgress(0.6)
+      Sys.sleep(0.5)  # opcional, solo para que se vea la barra
+    })
   })
   
     # Cargar datos al iniciar
   cargar_datos()
   
   output$ultima_actualizacion <- renderUI({
-    HTML(paste0(
-      "Última actualización:<br>",
-      format(Sys.time(), "%d/%m/%Y"), "<br>",
-      format(Sys.time(), "%H:%M:%S")
-    ))
+    if (is.null(ultima_fecha())) {
+      HTML("Última actualización:<br><em>No disponible aún</em>")
+    } else {
+      HTML(paste0(
+        "Última actualización:<br>",
+        format(ultima_fecha(), "%d/%m/%Y"), "<br>",
+        format(ultima_fecha(), "%H:%M:%S")
+      ))
+    }
   })
   
   # Value box: total de registros
