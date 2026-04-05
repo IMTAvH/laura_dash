@@ -1,245 +1,157 @@
 library(shiny)
-library(bslib)
 library(DT)
+library(bslib)
 library(dplyr)
 library(ggplot2)
-library(plotly)
-library(shinymanager)
+library(lubridate)
+library(stringr)
+library(scales)
+library(tidyr)
+library(purrr)
+library(reactable)
 library(httr)
 library(jsonlite)
+library(tibble)
 
+source("R/odk_auth.R")
 source("R/entidad_odk.R")
+source("R/formulario_odk.R")
+source("R/utils.R")
+source("R/mod_entities.R")
+source("R/mod_preregistro.R")
+source("R/mod_encuesta.R")
 
-ui <- page_sidebar(
-  
-  theme = bs_theme(bootswatch = "minty", version = 5),
+# =====================================================
+# CONFIG
+# =====================================================
 
-  fillable = TRUE, 
+tema_laura <- bs_theme(
+  version = 5,
   
-  sidebar = sidebar(
-    open = T, # panel izquierdo abierto al iniciar shiny
-    width = NULL,  # auto o usa "300px", "25%" si deseas tamaño fijo
-    tags$div(
-      style = "text-align: center;",
-      tags$img(src = "laura_logo.jpg", height = "180px"),
-      tags$h4("Proyecto Laura - Lima", style = "margin-top: 8px; font-weight: 750; color: #007195;")
-    ),
-    # tags$hr(),
-    actionButton(
-      "actualizar_datos",
-      label = "Actualizar datos",
-      icon = icon("sync"),
-      class = "btn btn-outline-primary btn-sm"
-    ),
-    tags$div(
-      style = "font-size: 12px; color: #555;",
-      uiOutput("ultima_actualizacion")
-    ),
-    # br(),
-    
-  ),
+  # 🎨 Colores principales
+  primary = "#2C7FB8",   # azul científico
+  secondary = "#7FCDBB", # verde suave
+  success = "#41AB5D",
+  info = "#1D91C0",
+  warning = "#FEB24C",
+  danger = "#FC4E2A",
   
-  layout_column_wrap(
-    fluidRow(
-      column(4, value_box(
-        title = "Inscritas",
-        value = textOutput("inscritas"),
-        showcase = icon("user"),
-        style = "background-color: #78B8C0; color: white;"
-        # theme_color = "primary"
-      )),
-      column(4, value_box(
-        title = "Consentimientos Informados",
-        value = textOutput("consentimientos_informados"),
-        showcase = icon("file-signature"),
-        style = "background-color: #3E91A5; color: white;"
-        # theme_color = "primary"
-      )),
-      column(4, value_box(
-        title = "Encuestas Nacionales completas",
-        value = textOutput("encuestas_nacionales"),
-        showcase = icon("clipboard-check"), 
-        style = "background-color: #007195; color: white;"
-        # theme_color = "primary"
-      )),
-      
-      card(
-        full_screen = TRUE,
-        class = "mb-4",
-        card_header("Evolución diaria"),
-        card_body(
-          plotlyOutput("grafico_inscripciones")
-        )
-      )
-    )
+  # 🧱 Fondo
+  bg = "#F8FAFC",
+  fg = "#1F2937",
+  
+  # 🔤 Tipografía
+  base_font = font_google("Inter"),
+  heading_font = font_google("Poppins"),
+  
+  # 📐 Estética moderna
+  border_radius = "0.75rem",
+  btn_border_radius = "0.75rem",
+  
+  # 📦 Espaciado
+  spacer = "1rem"
+)
+
+cfg_entities <- list(
+  id = "short_id",
+  age = "age",
+  consent = "consent",
+  complete = "complete_EN",
+  created = "__system.createdAt",
+  updated = "__system.updatedAt",
+  creator = "__system.creatorName",
+  phone = "phone",
+  email = "email"
+)
+
+cfg_preregistro <- list(
+  id = "participantes.short_id",
+  age = "participantes.edad",
+  region = "participantes.region",
+  phone = "participantes.mobile_phone",
+  email = "participantes.correo",
+  creator = "__system.submitterName",
+  created = "__system.submissionDate",
+  updated = NULL,
+  details_ok = "participantes.are_details_correct"
+)
+
+cfg_encuesta <- list(
+  id = "short_id",
+  age = "Q1.1-age",
+  created = "__system.submissionDate",
+  creator = "__system.submitterName",
+  menstruates_monthly = "Q7.2-menstruating_monthly",
+  bleeding_days = "Q7.4-menstrual_bleeding_days",
+  cycle_regularity = "Q7.5-menstrual_cycle_regularity",
+  bleeding_perception = "Q7.7-bleeding_perception",
+  pain = "Q7.13-menstruation_pain",
+  pain_intensity = "Q7.13.1-menstruation_pain_intensity",
+  pms_vars = c(
+    "Q7.20.1-pms_irritability",
+    "Q7.20.2-pms_anxiety",
+    "Q7.20.3-pms_tearfulness",
+    "Q7.20.4-pms_depressed_mood",
+    "Q7.20.8-pms_concentration_difficulty",
+    "Q7.20.9-pms_fatigue",
+    "Q7.20.11-pms_insomnia",
+    "Q7.20.14-pms_physical_symptoms"
   )
 )
 
-# Wrap your UI with secure_app
-ui <- secure_app(ui = ui, enable_admin = T)
+# =====================================================
+# DESCARGA DE DATOS DESDE ODK
+# =====================================================
+
+# Entidades
+df_entities <- obtener_df_entidad_participantes(
+  dataset_name = Sys.getenv("ODK_ENTITY_NAME"),
+  verbose = TRUE
+)
+
+# Formularios
+df_preregistro <- obtener_df_formulario(
+  xml_form_id = Sys.getenv("ODK_XML_FORM_ID_PREREGISTRO"),
+  table = "Submissions",
+  verbose = TRUE
+)
+
+df_encuesta <- obtener_df_formulario(
+  xml_form_id = Sys.getenv("ODK_XML_FORM_ID_ENCUESTA"),
+  table = "Submissions",
+  verbose = TRUE
+)
+
+
+ui <- page_navbar(
+  title = "Proyecto Laura - MVP",
+  theme = tema_laura,
+  # 
+  # header = tags$head(
+  #   tags$style(HTML("
+  #     .navbar {
+  #       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  #     }
+  #     .bslib-page-fill {
+  #       background-color: #F8FAFC;
+  #     }
+  #     .card {
+  #       border: none;
+  #       border-radius: 16px;
+  #       box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+  #     }
+  #   "))
+  # ),
+  
+  nav_panel("Entidades", mod_entities_ui("entities")),
+  nav_panel("Pre-registro", mod_preregistro_ui("preregistro")),
+  nav_panel("Encuesta", mod_encuesta_ui("encuesta"))
+)
 
 server <- function(input, output, session) {
-  
-  res_auth <- secure_server(
-    check_credentials = check_credentials(
-      "db/database.sqlite",
-      # passphrase = key_get("R-shinymanager-key", "obiwankenobi")
-      passphrase = Sys.getenv("SQL_DB_PASS")
-    )
-  )
-  
-  datos <- reactiveVal()
-  ultima_fecha <- reactiveVal()
-  
-  cargar_datos <- function() {
-    df <- tryCatch({
-      obtener_df_entidad_participantes()
-    }, error = function(e) {
-      message("Error al obtener los datos: ", e$message)
-      
-      set.seed(2)  # plantas la semilla
-      
-      n = 50 # cantidad de registros
-      
-      # Crear df con datos simulados
-      tibble::tibble(
-        `__id` = as.character(1:n),
-        label = paste0("99", sample(100000000:999999999, n)),
-        `__system` = data.frame(
-          createdAt = format(
-            as.POSIXct(runif(n, as.numeric(as.POSIXct("2025-06-04")), as.numeric(Sys.time())),
-                       origin = "1970-01-01", tz = "UTC"),
-            format = "%Y-%m-%dT%H:%M:%OSZ"
-          ),
-          creatorId = rep("137", n),
-          creatorName = rep("Encuesta Nacional en Salud Femenina - Preregistro", n),
-          updates = sample(0:5, n, replace = TRUE),
-          updatedAt = rep(NA_character_, n),
-          version = rep(1, n),
-          conflict = rep(NA, n),
-          stringsAsFactors = FALSE
-        ),
-        phone = paste0("9", sample(100000000:999999999, n)),
-        long_id = replicate(n, paste(sample(c(0:9, letters[1:6]), 64, replace = TRUE), collapse = "")),
-        email = paste0("correo", 1:n, "@example.com"),
-        short_id = substr(long_id, 1, 6),
-        consent = sample(c("yes", "no", ""), n, replace = TRUE),
-        complete_p1 = sample(c("yes", "no", ""), n, replace = TRUE),
-        complete_p2 = sample(c("yes", "no", ""), n, replace = TRUE),
-        complete_p3 = sample(c("yes", "no", ""), n, replace = TRUE)
-      )
-    })
-    datos(df)
-    ultima_fecha(Sys.time())
-  }
-  
-  observeEvent(input$actualizar_datos, {
-    message("Botón presionado: actualizando datos...")
-    
-    withProgress(message = "Actualizando datos...", value = 0.3, {
-      cargar_datos()
-      incProgress(0.6)
-      Sys.sleep(0.5)  # opcional, solo para que se vea la barra
-    })
-  })
-  
-    # Cargar datos al iniciar
-  cargar_datos()
-  
-  output$ultima_actualizacion <- renderUI({
-    if (is.null(ultima_fecha())) {
-      HTML("Última actualización:<br><em>No disponible aún</em>")
-    } else {
-      HTML(paste0(
-        "Última actualización:<br>",
-        format(ultima_fecha(), "%d/%m/%Y"), "<br>",
-        format(ultima_fecha(), "%H:%M:%S")
-      ))
-    }
-  })
-  
-  # Value box: total de registros
-  output$inscritas <- renderText({
-    datos() %>% 
-      nrow()
-  })
-  
-  output$consentimientos_informados <- renderText({
-    datos() %>% 
-      filter(consent=="yes") %>% 
-      nrow()
-  })
-  
-  output$encuestas_nacionales <- renderText({
-    datos() %>% 
-      filter(consent=="yes",complete_p1=="yes",complete_p2=="yes",complete_p3=="yes") %>% 
-      nrow()
-  })
-  
-  output$grafico_inscripciones <- renderPlotly({
-    df_datos <- datos()
-    
-    df_plot <- df_datos %>%
-      mutate(
-        fecha = as.POSIXct(`__system`$createdAt, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC"),
-        fecha = as.Date(format(fecha, tz = "America/Lima"))
-      ) %>%
-      mutate(
-        consentimiento = ifelse(consent == "yes", 1, 0),
-        completa = ifelse(consent == "yes" & complete_p1 == "yes" & complete_p2 == "yes" & complete_p3 == "yes", 1, 0)
-      ) %>%
-      group_by(fecha) %>%
-      summarise(
-        `Inscritas` = n(),
-        `Consentimiento informado` = sum(consentimiento),
-        `Encuesta nacional completa` = sum(completa),
-        .groups = "drop"
-      ) %>%
-      tidyr::pivot_longer(
-        cols = c("Inscritas", "Consentimiento informado", "Encuesta nacional completa"),
-        names_to = "tipo", values_to = "n"
-      ) %>% 
-      mutate(tipo = factor(tipo, levels = c(
-        "Inscritas",
-        "Consentimiento informado",
-        "Encuesta nacional completa"
-      )))
-    
-    p <- ggplot(df_plot, aes(x = fecha, y = n, color = tipo, linetype = tipo)) +
-      geom_line(size = 1) +
-      geom_point(size = 2) +
-      labs(x = "Fecha", y = "Cantidad", color = "", linetype = "") +
-      theme_minimal() +
-      scale_color_manual(
-        values = c(
-          "Inscritas" = "#78B8C0",                  # Azul institucional
-          "Consentimiento informado" = "#3E91A5",   # Azul intermedio
-          "Encuesta nacional completa" = "#007195"  # Azul claro
-        )
-      ) +
-      scale_linetype_manual(
-        values = c(
-          "Inscritas" = "dashed",
-          "Consentimiento informado" = "dashed",
-          "Encuesta nacional completa" = "solid"
-        )
-      )
-    
-    ggplotly(p) %>% 
-      layout(
-        legend = list(
-          orientation = "h",         # horizontal
-          x = 0.5,                   # centro horizontal
-          xanchor = "center",       
-          y = -0.2                   # debajo del gráfico
-        )
-      )
-  })
-  
-  # Render de la tabla
-  # output$tabla <- renderDT({
-  #   datatable(df, options = list(pageLength = 10), class = "table table-hover")
-  # })
+  mod_entities_server("entities", df_entities, cfg_entities)
+  mod_preregistro_server("preregistro", df_preregistro, cfg_preregistro)
+  mod_encuesta_server("encuesta", df_encuesta, cfg_encuesta)
 }
 
 shinyApp(ui, server)

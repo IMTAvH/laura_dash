@@ -1,30 +1,13 @@
-# R/entidad_odk.R
+# R/formulario_odk.R
 
 library(dplyr)
 library(tibble)
-library(purrr)
-library(tidyr)
 library(jsonlite)
+library(purrr)
 
-odk_flatten_df <- function(df) {
-  # Aplana columnas tipo data.frame anidadas, por ejemplo __system
-  nested_cols <- names(df)[purrr::map_lgl(df, is.data.frame)]
-  
-  if (length(nested_cols) == 0) return(as_tibble(df))
-  
-  out <- df
-  for (col in nested_cols) {
-    nested <- as_tibble(out[[col]])
-    names(nested) <- paste0(col, ".", names(nested))
-    out[[col]] <- NULL
-    out <- bind_cols(out, nested)
-  }
-  
-  as_tibble(out)
-}
-
-obtener_df_entidad_participantes <- function(
-    dataset_name = Sys.getenv("ODK_ENTITY_NAME"),
+obtener_df_formulario <- function(
+    xml_form_id,
+    table = "Submissions",
     select = NULL,
     filter = NULL,
     top = NULL,
@@ -34,14 +17,14 @@ obtener_df_entidad_participantes <- function(
 ) {
   cfg <- odk_get_config()
   
-  if (dataset_name == "") {
-    stop("Falta ODK_ENTITY_NAME en variables de entorno.", call. = FALSE)
+  if (missing(xml_form_id) || is.null(xml_form_id) || xml_form_id == "") {
+    stop("Debes indicar xml_form_id.", call. = FALSE)
   }
   
   url <- paste0(
     cfg$base_url,
     "/v1/projects/", cfg$project_id,
-    "/datasets/", dataset_name, ".svc/Entities"
+    "/forms/", xml_form_id, ".svc/", table
   )
   
   query <- list()
@@ -63,9 +46,8 @@ obtener_df_entidad_participantes <- function(
   }
   
   if (verbose) {
-    message("✅ Entidades descargadas: ", nrow(df), " registros.")
+    message("✅ Formulario ", xml_form_id, " descargado: ", nrow(df), " registros.")
   }
   
   df
 }
-
