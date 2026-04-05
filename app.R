@@ -1,6 +1,7 @@
 library(shiny)
 library(DT)
 library(bslib)
+library(shinymanager)
 library(dplyr)
 library(ggplot2)
 library(lubridate)
@@ -126,29 +127,31 @@ df_encuesta <- obtener_df_formulario(
 ui <- page_navbar(
   title = "Proyecto Laura - MVP",
   theme = tema_laura,
-  # 
-  # header = tags$head(
-  #   tags$style(HTML("
-  #     .navbar {
-  #       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-  #     }
-  #     .bslib-page-fill {
-  #       background-color: #F8FAFC;
-  #     }
-  #     .card {
-  #       border: none;
-  #       border-radius: 16px;
-  #       box-shadow: 0 4px 14px rgba(0,0,0,0.06);
-  #     }
-  #   "))
-  # ),
-  
+
   nav_panel("Entidades", mod_entities_ui("entities")),
   nav_panel("Pre-registro", mod_preregistro_ui("preregistro")),
   nav_panel("Encuesta", mod_encuesta_ui("encuesta"))
 )
 
+ui <- secure_app(
+  ui,
+  theme = tema_laura,
+  language = "es",
+  tags_top = tags$div(
+    style = "text-align:center; padding:10px;",
+    tags$h3("Proyecto Laura"),
+    tags$p("Acceso restringido")
+  )
+)
+
 server <- function(input, output, session) {
+  # Autenticación con SQLite
+  res_auth <- secure_server(
+    check_credentials = check_credentials(
+      db = "db/database.sqlite",
+      passphrase = Sys.getenv("SQL_DB_PASS")
+    )
+  )
   mod_entities_server("entities", df_entities, cfg_entities)
   mod_preregistro_server("preregistro", df_preregistro, cfg_preregistro)
   mod_encuesta_server("encuesta", df_encuesta, cfg_encuesta)

@@ -1,3 +1,4 @@
+# creds_db_init.R
 library(shinymanager)
 
 #### init the Sqlite Database
