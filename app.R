@@ -135,7 +135,7 @@ ui <- page_navbar(
 
 ui <- secure_app(
   ui,
-  # theme = tema_laura,
+  theme = tema_laura,
   language = "es",
   enable_admin = TRUE,
   tags_top = tags$div(
