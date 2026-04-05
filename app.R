@@ -137,6 +137,7 @@ ui <- secure_app(
   ui,
   theme = tema_laura,
   language = "es",
+  enable_admin = TRUE,
   tags_top = tags$div(
     style = "text-align:center; padding:10px;",
     tags$h3("Proyecto Laura"),
