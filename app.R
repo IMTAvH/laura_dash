@@ -78,25 +78,25 @@ cfg_preregistro <- list(
 )
 
 cfg_encuesta <- list(
-  id = "short_id",
-  age = "Q1.1-age",
+  id = "preamble.entity_details.short_id",
+  age = "general_data.Q1_3_age",
   created = "__system.submissionDate",
   creator = "__system.submitterName",
-  menstruates_monthly = "Q7.2-menstruating_monthly",
-  bleeding_days = "Q7.4-menstrual_bleeding_days",
-  cycle_regularity = "Q7.5-menstrual_cycle_regularity",
-  bleeding_perception = "Q7.7-bleeding_perception",
-  pain = "Q7.13-menstruation_pain",
-  pain_intensity = "Q7.13.1-menstruation_pain_intensity",
+  menstruates_monthly = "menstrual_health.Q7_2_menstruating_monthly",
+  bleeding_days = "menstrual_health.menstruating.Q7_4_menstrual_bleeding_days",
+  cycle_regularity = "menstrual_health.menstruating.Q7_5_menstrual_cycle_regularity",
+  bleeding_perception = "menstrual_health.menstruating.Q7_7_bleeding_perception",
+  pain = "menstrual_health.menstruating.Q7_13_menstruation_pain",
+  pain_intensity = "menstrual_health.menstruating.Q7_13_1_menstruation_pain_intensity",
   pms_vars = c(
-    "Q7.20.1-pms_irritability",
-    "Q7.20.2-pms_anxiety",
-    "Q7.20.3-pms_tearfulness",
-    "Q7.20.4-pms_depressed_mood",
-    "Q7.20.8-pms_concentration_difficulty",
-    "Q7.20.9-pms_fatigue",
-    "Q7.20.11-pms_insomnia",
-    "Q7.20.14-pms_physical_symptoms"
+    "menstrual_health_spm.Q7_20_1_pms_irritability",
+    "menstrual_health_spm.Q7_20_2_pms_anxiety",
+    "menstrual_health_spm.Q7_20_3_pms_tearfulness",
+    "menstrual_health_spm.Q7_20_4_pms_depressed_mood",
+    "menstrual_health_spm.Q7_20_8_pms_concentration_difficulty",
+    "menstrual_health_spm.Q7_20_9_pms_fatigue",
+    "menstrual_health_spm.Q7_20_11_pms_insomnia",
+    "menstrual_health_spm.Q7_20_14_pms_physical_symptoms"
   )
 )
 

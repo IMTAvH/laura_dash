@@ -33,14 +33,14 @@ obtener_df_formulario <- function(
   if (!is.null(top))    query[["$top"]]    <- top
   if (!is.null(skip))   query[["$skip"]]   <- skip
   
-  data_list <- odk_get_json(url = url, query = query, cfg = cfg, verbose = verbose)
-  
+  data_list <- odk_get_json(url = url, query = query, cfg = cfg, verbose = verbose, simplify = TRUE)
+
   if (!"value" %in% names(data_list)) {
     stop("❌ La respuesta no contiene 'value'.", call. = FALSE)
   }
-  
-  df <- tibble::as_tibble(jsonlite::fromJSON(jsonlite::toJSON(data_list$value), flatten = FALSE))
-  
+
+  df <- tibble::as_tibble(data_list$value)
+
   if (flatten) {
     df <- odk_flatten_df(df)
   }

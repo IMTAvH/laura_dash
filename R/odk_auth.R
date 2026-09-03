@@ -44,18 +44,22 @@ odk_stop_for_status <- function(res) {
   stop("❌ Error HTTP ", sc, ": ", body_txt, call. = FALSE)
 }
 
-odk_get_json <- function(url, query = list(), cfg = odk_get_config(), verbose = FALSE) {
+odk_get_json <- function(url, query = list(), cfg = odk_get_config(), verbose = FALSE, simplify = FALSE) {
   if (verbose) message("GET ", url)
-  
+
   res <- GET(
     url = url,
     odk_auth(cfg),
     odk_accept_json(),
     query = query
   )
-  
+
   odk_stop_for_status(res)
-  
+
   txt <- content(res, as = "text", encoding = "UTF-8")
-  fromJSON(txt, simplifyVector = FALSE)
+
+  # simplify = TRUE deja que jsonlite rectangule el JSON en una sola pasada
+  # (data.frames anidados, NA reales para campos ausentes/omitidos por skip-logic).
+  # simplify = FALSE preserva listas de listas puras, útil para inspección/metadata.
+  fromJSON(txt, simplifyVector = simplify, flatten = FALSE)
 }
