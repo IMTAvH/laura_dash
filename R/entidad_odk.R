@@ -6,21 +6,28 @@ library(purrr)
 library(tidyr)
 library(jsonlite)
 
-odk_flatten_df <- function(df) {
-  # Aplana columnas tipo data.frame anidadas, por ejemplo __system
-  nested_cols <- names(df)[purrr::map_lgl(df, is.data.frame)]
-  
-  if (length(nested_cols) == 0) return(as_tibble(df))
-  
-  out <- df
-  for (col in nested_cols) {
-    nested <- as_tibble(out[[col]])
-    names(nested) <- paste0(col, ".", names(nested))
-    out[[col]] <- NULL
-    out <- bind_cols(out, nested)
+odk_flatten_df <- function(df, max_depth = 10) {
+  # Aplana columnas tipo data.frame anidadas de forma recursiva, por ejemplo
+  # __system, o grupos ODK anidados a varios niveles (grupo.subgrupo.campo).
+  out <- as_tibble(df)
+  depth <- 0
+
+  repeat {
+    nested_cols <- names(out)[purrr::map_lgl(out, is.data.frame)]
+    if (length(nested_cols) == 0 || depth >= max_depth) break
+
+    for (col in nested_cols) {
+      nested <- as_tibble(out[[col]])
+      out[[col]] <- NULL
+      if (ncol(nested) == 0) next # grupo ODK vacío (solo notas/labels), no aporta columnas
+      names(nested) <- paste0(col, ".", names(nested))
+      out <- bind_cols(out, nested)
+    }
+
+    depth <- depth + 1
   }
-  
-  as_tibble(out)
+
+  out
 }
 
 obtener_df_entidad_participantes <- function(
@@ -50,14 +57,14 @@ obtener_df_entidad_participantes <- function(
   if (!is.null(top))    query[["$top"]]    <- top
   if (!is.null(skip))   query[["$skip"]]   <- skip
   
-  data_list <- odk_get_json(url = url, query = query, cfg = cfg, verbose = verbose)
-  
+  data_list <- odk_get_json(url = url, query = query, cfg = cfg, verbose = verbose, simplify = TRUE)
+
   if (!"value" %in% names(data_list)) {
     stop("❌ La respuesta no contiene 'value'.", call. = FALSE)
   }
-  
-  df <- tibble::as_tibble(jsonlite::fromJSON(jsonlite::toJSON(data_list$value), flatten = FALSE))
-  
+
+  df <- tibble::as_tibble(data_list$value)
+
   if (flatten) {
     df <- odk_flatten_df(df)
   }
